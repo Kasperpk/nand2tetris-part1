@@ -1,0 +1,33 @@
+@SCREEN
+	D=A
+	@addr 
+	M=D
+(LOOP)
+	@KBD
+	D=M
+    @WHITEPIXEL
+    D;JEQ
+	@BLACKPIXEL
+    0;JMP	
+(BLACKPIXEL)
+	@addr
+    A=M 
+    M=-1
+    @addr
+    D=M 
+    D=D+1
+    @addr
+    M=D
+    @LOOP
+    0;JMP 
+(WHITEPIXEL)
+    @addr 
+	A=M 
+    M=0
+    @addr
+    D=M
+    D=D-1
+    @addr
+    M=D
+    @LOOP
+    0;JMP 
