@@ -1,0 +1,57 @@
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+                         
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+     PARTS:
+    
+    // Use DMux for cleaner instruction type detection
+    DMux(in=true, sel=instruction[15], a=atype, b=ctype);
+
+    // A register logic
+    Or(a=atype, b=instruction[5], out=loadA);
+    Mux16(a=ALUOut, b=instruction, sel=atype, out=ARegIn);
+    ARegister(in=ARegIn, load=loadA, out=aregout, out[0..14]=addressM);
+
+   
+
+    // ALU logic: choose between A register and M input based on 'a' bit
+    Mux16(a=aregout, b=inM, sel=instruction[12], out=MuxOut);
+    ALU(x=dregout, y=MuxOut, zx=instruction[11], nx=instruction[10], zy=instruction[9], 
+        ny=instruction[8], f=instruction[7], no=instruction[6], out=ALUOut, out=outM, zr=ZROut, ng=NGOut);
+
+     // D register logic
+    And(a=ctype, b=instruction[4], out=loadD);
+    DRegister(in=ALUOut, load=loadD, out=dregout);
+
+    // writeM: only for C-instructions when dest bit 'M' is set
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // Jump Logic
+    // Determine if ALU output is positive (not zero and not negative)
+    Or(a=ZROut, b=NGOut, out=notPositive);
+    Not(in=notPositive, out=positive);
+
+    // Check each jump condition
+    And(a=instruction[2], b=NGOut, out=jumpNeg);     // Jump if negative
+    And(a=instruction[1], b=ZROut, out=jumpZero);    // Jump if zero
+    And(a=instruction[0], b=positive, out=jumpPos);  // Jump if positive
+
+    // Jump if any condition is met
+    Or(a=jumpNeg, b=jumpZero, out=jumpNegOrZero);
+    Or(a=jumpNegOrZero, b=jumpPos, out=jumpCondition);
+
+    // Only jump if it's a C-instruction AND jump condition is met
+    And(a=instruction[15], b=jumpCondition, out=shouldJump);
+
+    // PC: load A register value if jumping, otherwise increment
+    PC(in=aregout, load=shouldJump, inc=true, reset=reset, out[0..14]=pc);
+}
